@@ -1,0 +1,9 @@
+pipelines:
+  - name: ooxx
+    pattern: ooxx/.*
+    process:
+      - type: delay
+        arg: "1.0"
+      # - type: move
+      #   arg: "ooxx/{timestamp}-{md5}.{suffix}"
+      - type: debug_info
