@@ -6,9 +6,11 @@ __all__ = ["ProcessMap"]
 
 ProcessMap = {}
 
+
 def wrapper(func):
     logging.debug(f"loading {func.__name__}")
     ProcessMap[func.__name__] = func
+
     @functools.wraps(func)
     def f(*args, **kwargs):
         return func(*args, **kwargs)
@@ -21,9 +23,11 @@ async def delay(context, arg):
     logging.debug(f"delay {ts}")
     await asyncio.sleep(ts)
 
+
 @wrapper
 async def move(context, arg):
     raise NotImplementedError()
+
 
 @wrapper
 async def debug_info(context, arg):

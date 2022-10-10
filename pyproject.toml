@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "nas-agent"
+version = "0.1.0"
+description = "NAS Agent"
+authors = ["P4SSER8Y <P4SSER8Y@outlook.com>"]
+license = "WTFPL"
+readme = "README.md"
+packages = [{include = "nas_agent"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+watchdog = "^2.1.9"
+PyYAML = "^6.0"
+click = "^8.1.3"
+
+[tool.autopep8]
+max_line_length = 120
+aggressive = 3
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

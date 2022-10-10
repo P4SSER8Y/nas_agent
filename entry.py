@@ -1,10 +1,11 @@
+# autopep8: on
 import logging
 logging.basicConfig(level=logging.DEBUG, format="[%(asctime)s][%(levelname)s][%(threadName)s] %(message)s")
+# autopep8: off
 
-import signal
-import click
 from sorting_agent import SortingAgent
-
+import click
+import signal
 
 sorting_agent = SortingAgent()
 

@@ -7,6 +7,7 @@ from .processes import ProcessMap
 
 __all__ = ["SortingAgent"]
 
+
 class SortingAgent(threading.Thread):
     _event_quit_ = None
     _loop_ = None
