@@ -1,14 +1,18 @@
-# autopep8: on
 import logging
-logging.basicConfig(level=logging.DEBUG, format="[%(asctime)s][%(levelname)s][%(threadName)s] %(message)s")
-# autopep8: off
+from rich.logging import RichHandler
+logging.basicConfig(level=logging.INFO,
+                    format="[%(threadName)s] %(message)s",
+                    datefmt="[%m-%d %H:%M:%S]",
+                    handlers=[RichHandler(rich_tracebacks=True)])
 
 import click
 from sorting_agent import SortingAgent
 import signal
 import yaml
 
+
 threads = []
+
 
 def handler_SIGINT(signum, frame):
     logging.warning("SIGINT raised")
@@ -37,13 +41,14 @@ def factory(object: dict):
 def main(config):
     signal.signal(signal.SIGINT, handler_SIGINT)
     with open(config, "r") as f:
-        items = yaml.load(f, yaml.FullLoader)
-    for item in items:
+            items = yaml.load(f, yaml.FullLoader)
+    for item in items["agents"]:
         object = factory(item)
         if object:
             threads.append(object)
     [x.start() for x in threads]
     [x.join() for x in threads]
+    logging.info("goodbye")
 
 
 if __name__ == "__main__":
