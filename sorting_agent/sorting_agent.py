@@ -15,17 +15,19 @@ __all__ = ["SortingAgent"]
 
 class Handler(FileSystemEventHandler):
     _agent_ = None
+    _observer_ = None
 
-    def __init__(self, agent):
+    def __init__(self, observer, agent):
+        self._observer_ = observer
         self._agent_ = agent
 
-    def _format_and_handle_(self, event: FileSystemEvent):
+    def _format_and_push_event_(self, event: FileSystemEvent):
         context = {}
         context["source"] = pathlib.Path(event.src_path).absolute().resolve()
         context["event"] = event.event_type
         context["is_dir"] = event.is_directory
         if self._agent_:
-            self._agent_.handle(context)
+            self._agent_.push(context)
 
     def on_modified(self, event: FileSystemEvent):
         logging.debug(
@@ -33,20 +35,22 @@ class Handler(FileSystemEventHandler):
                 event.src_path,
                 event.is_directory,
                 event.is_synthetic))
-        self._format_and_handle_(event)
+        self._format_and_push_event_(event)
 
     def on_moved(self, event: FileSystemEvent):
         logging.debug("{} moved dir={} is_synthetic={}".format(event.src_path, event.is_directory, event.is_synthetic))
-        self._format_and_handle_(event)
+        self._format_and_push_event_(event)
 
 
 class SortingAgent(threading.Thread):
     _event_quit_ = None
     _loop_ = None
-    _pipelines_ = []
+    _pipelines_ = None
     _observer_ = None
-    _event_handler_ = LoggingEventHandler()
-    _cnt_ = 0
+    _cnt_ = None
+    _timer_debounce_ = None
+    _mutex_ = None
+    _current_tasks_ = None
 
     def __init__(self, group=None, name="SortingAgent", args=(), kwargs={}, daemon=None):
         super().__init__(group=group, name=name, args=args, kwargs=kwargs, daemon=daemon)
@@ -54,6 +58,10 @@ class SortingAgent(threading.Thread):
         self._event_quit_ = asyncio.Event()
         self._event_quit_.clear()
         self._observer_ = Observer()
+        self._mutex_ = threading.Lock()
+        self._pipelines_ = []
+        self._current_tasks_ = {}
+        self._cnt_ = 0
 
     def load_config(self, path):
         raw = None
@@ -84,7 +92,7 @@ class SortingAgent(threading.Thread):
     def run(self):
         for item in self._pipelines_:
             logging.info(f"{item['name']}: monitor {item['input']}")
-            self._observer_.schedule(Handler(self), item["input"], False)
+            self._observer_.schedule(Handler(self._observer_, self), item["input"], False)
 
         self._observer_.start()
         asyncio.set_event_loop(self._loop_)
@@ -101,6 +109,7 @@ class SortingAgent(threading.Thread):
         asyncio.run_coroutine_threadsafe(self._async_quit(), self._loop_)
 
     async def _async_handle(self, context: dict):
+        await asyncio.sleep(1)
         cnt = self._cnt_
         self._cnt_ += 1
         success = False
@@ -137,8 +146,15 @@ class SortingAgent(threading.Thread):
         else:
             logging.warning(f"[{cnt}] unmatched any patterns for {context['source']}")
 
-    def handle(self, context):
-        asyncio.run_coroutine_threadsafe(self._async_handle(context), self._loop_)
+    def push(self, context):
+        self._mutex_.acquire()
+        if context["source"] in self._current_tasks_.keys():
+            logging.debug(f"debounce {context['source']}")
+        else:
+            task = asyncio.run_coroutine_threadsafe(self._async_handle(context), self._loop_)
+            self._current_tasks_[context["source"]] = task
+            task.add_done_callback(lambda task: self._current_tasks_.pop(context["source"]))
+        self._mutex_.release()
 
 
 if __name__ == "__main__":
