@@ -1,7 +1,11 @@
 pipelines:
   - name: ooxx
-    pattern: ooxx/.*
+    pattern: wtf.*
+    input: ./test/ooxx
+    context:
+      output: ./test/output/ooxx
     process:
+      - type: skip_directory
       - type: delay
         arg: "1.0"
       # - type: move

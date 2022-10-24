@@ -22,6 +22,7 @@ async def delay(context, arg):
     ts = float(arg)
     logging.debug(f"delay {ts}")
     await asyncio.sleep(ts)
+    return context
 
 
 @wrapper
@@ -30,5 +31,17 @@ async def move(context, arg):
 
 
 @wrapper
-async def debug_info(context, arg):
+def debug_info(context, arg):
     logging.info(f"{context}")
+    return context
+
+@wrapper
+def failure(context, arg):
+    return None
+
+@wrapper
+def skip_directory(context, arg):
+    if context["is_dir"]:
+        return None
+    else:
+        return context
