@@ -1,0 +1,3 @@
+- name: sorting-agent
+  type: sorting_agent
+  config: ./sorting_config.yml

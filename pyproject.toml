@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nas-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "NAS Agent"
 authors = ["P4SSER8Y <P4SSER8Y@outlook.com>"]
 license = "WTFPL"
