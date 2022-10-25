@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import datetime
 import threading
 import pathlib
 import asyncio
@@ -9,6 +10,7 @@ from time import sleep
 import yaml
 from .processes import ProcessMap
 import re
+import traceback
 
 __all__ = ["SortingAgent"]
 
@@ -71,7 +73,10 @@ class SortingAgent(threading.Thread):
         for item in raw["pipelines"]:
             temp = {}
             temp["name"] = item["name"]
-            temp["pattern"] = item["pattern"]
+            if "glob" in item.keys():
+                temp["glob"] = item["glob"]
+            else:
+                temp["re"] = item["re"]
             temp["process"] = []
             temp["input"] = pathlib.Path(item["input"]).absolute().resolve()
             if "context" in item.keys():
@@ -92,7 +97,7 @@ class SortingAgent(threading.Thread):
     def run(self):
         for item in self._pipelines_:
             logging.info(f"{item['name']}: monitor {item['input']}")
-            self._observer_.schedule(Handler(self._observer_, self), item["input"], False)
+            self._observer_.schedule(Handler(self._observer_, self), item["input"], True)
 
         self._observer_.start()
         asyncio.set_event_loop(self._loop_)
@@ -109,48 +114,61 @@ class SortingAgent(threading.Thread):
         asyncio.run_coroutine_threadsafe(self._async_quit(), self._loop_)
 
     async def _async_handle(self, context: dict):
-        await asyncio.sleep(1)
-        cnt = self._cnt_
-        self._cnt_ += 1
-        success = False
-        for pipeline in self._pipelines_:
-            t = deepcopy(context)
-            if t["source"] == pipeline["input"]:
-                continue
-            if not t["source"].is_relative_to(pipeline["input"]):
-                continue
-            t["relative_path"] = t["source"].relative_to(pipeline["input"])
-            if not re.match(pipeline["pattern"], str(t["relative_path"])):
-                continue
-            logging.info(f"[{cnt}] matched {pipeline['name']} for {t['source']}")
-            t.update(pipeline["context"])
-            for h in pipeline["process"]:
-                f, arg = h["function"], h["arg"]
-                # logging.debug(f"[{cnt}] enter {f.__name__}")
-                try:
-                    if asyncio.iscoroutinefunction(f):
-                        t = await f(t, arg)
-                    else:
-                        t = f(t, arg)
-                except Exception as e:
-                    logging.critical(f"[{cnt}] handle {f.__name__} error: {e}")
-                    t = None
-                if not t:
+        try:
+            await asyncio.sleep(1)
+            cnt = self._cnt_
+            self._cnt_ += 1
+            success = False
+            for pipeline in self._pipelines_:
+                t = deepcopy(context)
+                if t["source"] == pipeline["input"]:
+                    continue
+                if not t["source"].is_relative_to(pipeline["input"]):
+                    continue
+                t["relative_path"] = t["source"].relative_to(pipeline["input"])
+                if "re" in pipeline.keys():
+                    if not re.match(pipeline["re"], str(t["relative_path"])):
+                        logging.debug(f"[{cnt}] \"{t['relative_path']}\" unmatched to REGEX\"{pipeline['re']}\"")
+                        continue
+                elif "glob" in pipeline.keys():
+                    if not t["relative_path"].match(pipeline["glob"]):
+                        logging.debug(f"[{cnt}] \"{t['relative_path']}\" unmatched to GLOB\"{pipeline['glob']}\"")
+                        continue
+                else:
+                    continue
+                logging.info(f"[{cnt}] matched {pipeline['name']} for {t['source']}")
+                t.update(pipeline["context"])
+                for h in pipeline["process"]:
+                    f, arg = h["function"], h["arg"]
+                    # logging.debug(f"[{cnt}] enter {f.__name__}")
+                    try:
+                        if asyncio.iscoroutinefunction(f):
+                            t = await f(t, arg)
+                        else:
+                            t = f(t, arg)
+                    except Exception as e:
+                        logging.critical(f"[{cnt}] handle {f.__name__} error")
+                        logging.critical(traceback.format_exc())
+                        t = None
+                    if not t:
+                        break
+                    # logging.debug(f'[{cnt}] {t}')
+                if t:
+                    success = True
                     break
-                # logging.debug(f'[{cnt}] {t}')
-            if t:
-                success = True
-                break
-        if success:
-            logging.info(f"[{cnt}] success to process {context['source']}")
-        else:
-            logging.warning(f"[{cnt}] unmatched any patterns for {context['source']}")
+            if success:
+                logging.info(f"[{cnt}] success to process {context['source']}")
+            else:
+                logging.warning(f"[{cnt}] unmatched any patterns for {context['source']}")
+        except Exception as e:
+            logging.critical(traceback.format_exc())
 
     def push(self, context):
         self._mutex_.acquire()
         if context["source"] in self._current_tasks_.keys():
             logging.debug(f"debounce {context['source']}")
         else:
+            context["timestamp"] = datetime.now().timestamp()
             task = asyncio.run_coroutine_threadsafe(self._async_handle(context), self._loop_)
             self._current_tasks_[context["source"]] = task
             task.add_done_callback(lambda task: self._current_tasks_.pop(context["source"]))

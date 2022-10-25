@@ -1,13 +1,19 @@
 pipelines:
+  - name: wtf
+    re: "wtf(?!\\d).*.txt"
+    input: ./test/ooxx
+    context:
+      output: ./test/output/ooxx
+    process:
+      - type: debug_info
   - name: ooxx
-    pattern: wtf.*
+    glob: "*"
     input: ./test/ooxx
     context:
       output: ./test/output/ooxx
     process:
       - type: skip_directory
-      - type: delay
-        arg: "1.0"
-      # - type: move
-      #   arg: "ooxx/{timestamp}-{md5}.{suffix}"
+      - type: parse_filename
+      - type: move
+        arg: "{output}/{relative_parent}/{timestamp:0.0f}{suffix}"
       - type: debug_info
