@@ -83,6 +83,10 @@ class SortingAgent(threading.Thread):
                 temp["context"] = item["context"]
             else:
                 temp["context"] = {}
+            if "blacklist" in item.keys():
+                temp["blacklist"] = item["blacklist"]
+            else:
+                temp["blacklist"] = []
             for process in item["process"]:
                 p = {}
                 p["function"] = ProcessMap[process["type"]]
@@ -136,6 +140,13 @@ class SortingAgent(threading.Thread):
                         continue
                 else:
                     continue
+                flag = False
+                for item in pipeline["blacklist"]:
+                    if t["relative_path"].match(item):
+                        flag = True
+                        break
+                if flag:
+                    continue
                 logging.info(f"[{cnt}] matched {pipeline['name']} for {t['source']}")
                 t.update(pipeline["context"])
                 for h in pipeline["process"]:
@@ -168,7 +179,7 @@ class SortingAgent(threading.Thread):
         if context["source"] in self._current_tasks_.keys():
             logging.debug(f"debounce {context['source']}")
         else:
-            context["timestamp"] = datetime.now().timestamp()
+            context["timestamp"] = datetime.now().timestamp() * 1e9
             task = asyncio.run_coroutine_threadsafe(self._async_handle(context), self._loop_)
             self._current_tasks_[context["source"]] = task
             task.add_done_callback(lambda task: self._current_tasks_.pop(context["source"]))

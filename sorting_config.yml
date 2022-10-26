@@ -1,6 +1,14 @@
+shared:
+  blacklist: &blacklist
+    - "@eaDir"
+    - "*.!sync"
+    - ".sync"
+    - "*.crdownload"
+
 pipelines:
   - name: wtf
     re: "wtf(?!\\d).*.txt"
+    blacklist: *blacklist
     input: ./test/ooxx
     context:
       output: ./test/output/ooxx
@@ -9,6 +17,7 @@ pipelines:
   - name: ooxx
     glob: "*"
     input: ./test/ooxx
+    blacklist: *blacklist
     context:
       output: ./test/output/ooxx
     process:
