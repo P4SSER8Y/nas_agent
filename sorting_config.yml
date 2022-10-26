@@ -22,7 +22,11 @@ pipelines:
       output: ./test/output/ooxx
     process:
       - type: skip_directory
+      - type: generate_uuid
+        arg: 6
+      - type: digest
+        arg: sha1
       - type: parse_filename
       - type: move
-        arg: "{output}/{relative_parent}/{timestamp:0.0f}{suffix}"
+        arg: "{output}/{relative_parent}/{timestamp:0.0f}-{digest}{suffix}"
       - type: debug_info

@@ -4,8 +4,9 @@ import asyncio
 import hashlib
 import shutil
 import os
-import sys
 import pathlib
+import aiofiles
+import shortuuid
 __all__ = ["ProcessMap"]
 
 ProcessMap = {}
@@ -148,11 +149,41 @@ def parse_filename(context, arg):
 
 
 @wrapper
-async def get_md5(context, arg):
-    """calculate MD5 hash value with file's content
+async def digest(context, arg):
+    """calculate digest with file's content
 
     input: source
-    arg: None
-    output: md5
+    arg: ["md5", "sha1", "sha256"]
+    output: digest
     """
-    pass
+    hash = None
+    match arg.lower():
+        case 'md5':
+            hash = hashlib.md5()
+        case 'sha1':
+            hash = hashlib.sha1()
+        case 'sha256':
+            hash = hashlib.sha256()
+        case default:
+            raise NotImplementedError(f"unknown algorithm={arg}")
+    async with aiofiles.open(context['source'], 'rb') as f:
+        while True:
+            buffer = await f.read(16 * 1024 * 1024)
+            if len(buffer) == 0:
+                break
+            logging.debug(f"get {buffer}")
+            hash.update(buffer)
+    context["digest"] = hash.hexdigest()
+    return context
+
+
+@wrapper
+def generate_uuid(context, arg):
+    """generate short uuid
+
+    input: None
+    arg: length
+    output: uuid
+    """
+    context["uuid"] = shortuuid.ShortUUID().random(int(arg))
+    return context

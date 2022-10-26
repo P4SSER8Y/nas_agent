@@ -179,7 +179,7 @@ class SortingAgent(threading.Thread):
         if context["source"] in self._current_tasks_.keys():
             logging.debug(f"debounce {context['source']}")
         else:
-            context["timestamp"] = datetime.now().timestamp() * 1e9
+            context["timestamp"] = int(datetime.now().timestamp() * 1e9)
             task = asyncio.run_coroutine_threadsafe(self._async_handle(context), self._loop_)
             self._current_tasks_[context["source"]] = task
             task.add_done_callback(lambda task: self._current_tasks_.pop(context["source"]))
