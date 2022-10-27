@@ -154,7 +154,7 @@ async def digest(context, arg):
 
     input: source
     arg: ["md5", "sha1", "sha256"]
-    output: digest
+    output: digest, md5 | sha1 | sha256
     """
     hash = None
     match arg.lower():
@@ -174,6 +174,7 @@ async def digest(context, arg):
             logging.debug(f"get {buffer}")
             hash.update(buffer)
     context["digest"] = hash.hexdigest()
+    context[arg.lower()] = hash.hexdigest()
     return context
 
 
