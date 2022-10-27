@@ -1,10 +1,11 @@
 from copy import deepcopy
+import os
 from datetime import datetime
 import threading
 import pathlib
 import asyncio
 import logging
-from watchdog.events import LoggingEventHandler, FileSystemEventHandler, FileSystemEvent
+from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 from time import sleep
 import yaml
@@ -45,15 +46,6 @@ class Handler(FileSystemEventHandler):
 
 
 class SortingAgent(threading.Thread):
-    _event_quit_ = None
-    _loop_ = None
-    _pipelines_ = None
-    _observer_ = None
-    _cnt_ = None
-    _timer_debounce_ = None
-    _mutex_ = None
-    _current_tasks_ = None
-
     def __init__(self, group=None, name="SortingAgent", args=(), kwargs={}, daemon=None):
         super().__init__(group=group, name=name, args=args, kwargs=kwargs, daemon=daemon)
         self._loop_ = asyncio.new_event_loop()
@@ -64,6 +56,7 @@ class SortingAgent(threading.Thread):
         self._pipelines_ = []
         self._current_tasks_ = {}
         self._cnt_ = 0
+        self._init_scan_ = []
 
     def load_config(self, path):
         raw = None
@@ -90,6 +83,7 @@ class SortingAgent(threading.Thread):
                     p["arg"] = process.get("arg", "")
                     temp["process"].append(p)
                 self._pipelines_.append(temp)
+                self._init_scan_.append(temp["input"])
                 logging.debug(temp)
         except KeyError as e:
             logging.critical(f"parse config failed: Key {e} not found")
@@ -103,6 +97,20 @@ class SortingAgent(threading.Thread):
 
         self._observer_.start()
         asyncio.set_event_loop(self._loop_)
+        logging.info("start initial scanning")
+        for item in self._init_scan_:
+            for root, _, files in os.walk(item):
+                for file in files:
+                    self.push({
+                        "source": pathlib.Path(os.path.join(root, file)).absolute().resolve(),
+                        "event": "initialize",
+                        "is_dir": False,
+                    })
+                self.push({
+                    "source": pathlib.Path(root).absolute().resolve(),
+                    "event": "initialize",
+                    "is_dir": True
+                })
         logging.info("agent started")
         self._loop_.run_until_complete(self._event_quit_.wait())
         logging.info("agent stopped")
@@ -177,6 +185,7 @@ class SortingAgent(threading.Thread):
         if context["source"] in self._current_tasks_.keys():
             logging.debug(f"debounce {context['source']}")
         else:
+            logging.debug(f"push {context}")
             context["timestamp"] = int(datetime.now().timestamp() * 1e9)
             task = asyncio.run_coroutine_threadsafe(self._async_handle(context), self._loop_)
             self._current_tasks_[context["source"]] = task
