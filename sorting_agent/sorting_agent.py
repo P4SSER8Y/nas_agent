@@ -69,33 +69,31 @@ class SortingAgent(threading.Thread):
         raw = None
         logging.info("loading {}".format(path))
         with open(path, "r") as f:
-            raw = yaml.load(f, Loader=yaml.FullLoader)
-        for item in raw["pipelines"]:
-            temp = {}
-            temp["name"] = item["name"]
-            if "glob" in item.keys():
-                temp["glob"] = item["glob"]
-            else:
-                temp["re"] = item["re"]
-            temp["process"] = []
-            temp["input"] = pathlib.Path(item["input"]).absolute().resolve()
-            if "context" in item.keys():
-                temp["context"] = item["context"]
-            else:
-                temp["context"] = {}
-            if "blacklist" in item.keys():
-                temp["blacklist"] = item["blacklist"]
-            else:
-                temp["blacklist"] = []
-            for process in item["process"]:
-                p = {}
-                p["function"] = ProcessMap[process["type"]]
-                if "arg" in process.keys():
-                    p["arg"] = process["arg"]
+            raw = yaml.load(f, Loader=yaml.SafeLoader)
+        try:
+            for item in raw["pipelines"]:
+                temp = {}
+                temp["name"] = item["name"]
+                if ("glob" in item.keys()) and ("re" in item.keys()):
+                    raise Exception(f"use either glob or re in {item['name']}")
+                if "glob" in item.keys():
+                    temp["glob"] = item["glob"]
                 else:
-                    p["arg"] = ""
-                temp["process"].append(p)
-            self._pipelines_.append(temp)
+                    temp["re"] = item["re"]
+                temp["process"] = []
+                temp["input"] = pathlib.Path(item["input"]).absolute().resolve()
+                temp["context"] = item.get("context", {})
+                temp["blacklist"] = item.get("blacklist", [])
+                for process in item["process"]:
+                    p = {}
+                    p["function"] = ProcessMap[process["type"]]
+                    p["arg"] = process.get("arg", "")
+                    temp["process"].append(p)
+                self._pipelines_.append(temp)
+                logging.debug(temp)
+        except KeyError as e:
+            logging.critical(f"parse config failed: Key {e} not found")
+            raise e
         logging.debug(self._pipelines_)
 
     def run(self):
