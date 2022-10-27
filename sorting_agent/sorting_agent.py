@@ -149,6 +149,7 @@ class SortingAgent(threading.Thread):
                 flag = False
                 for item in pipeline["blacklist"]:
                     if t["relative_path"].match(item):
+                        logging.debug(f"[{cnt}] blacklist \"{item}\" matches \"{t['relative_path']}\"")
                         flag = True
                         break
                 if flag:
