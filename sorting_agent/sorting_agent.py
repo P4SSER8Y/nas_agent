@@ -12,6 +12,7 @@ import yaml
 from .processes import ProcessMap
 import re
 import traceback
+from fnmatch import fnmatch
 
 __all__ = ["SortingAgent"]
 
@@ -123,6 +124,14 @@ class SortingAgent(threading.Thread):
     def require_quit(self):
         asyncio.run_coroutine_threadsafe(self._async_quit(), self._loop_)
 
+    def _blacklisted(self, path: pathlib.Path, blacklist):
+        for item in blacklist:
+            for part in path.parts:
+                if fnmatch(part, item):
+                    logging.debug(f"\'{path}\' is blacklisted by \'{item}\'")
+                    return True
+        return False
+
     async def _async_handle(self, context: dict):
         try:
             await asyncio.sleep(1)
@@ -146,13 +155,7 @@ class SortingAgent(threading.Thread):
                         continue
                 else:
                     continue
-                flag = False
-                for item in pipeline["blacklist"]:
-                    if t["relative_path"].match(item):
-                        logging.debug(f"[{cnt}] blacklist \"{item}\" matches \"{t['relative_path']}\"")
-                        flag = True
-                        break
-                if flag:
+                if self._blacklisted(t["relative_path"], pipeline["blacklist"]):
                     continue
                 logging.info(f"[{cnt}] matched {pipeline['name']} for {t['source']}")
                 t.update(pipeline["context"])
