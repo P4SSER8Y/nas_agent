@@ -1,6 +1,7 @@
 import yaml
 import signal
 from sorting_agent import SortingAgent
+from dove import Dove
 import logging
 
 
@@ -17,6 +18,7 @@ def handler_SIGINT(signum, frame):
 def factory(object: dict):
     _MAP_ = {
         "sorting_agent": SortingAgent,
+        "dove": Dove,
     }
     logging.debug(object)
 

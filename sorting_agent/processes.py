@@ -154,8 +154,9 @@ def parse_filename(context: dict, arg: None) -> Optional[dict]:
 
     input: source
     arg: None
-    output: parent, relative_parent, suffix, stem
+    output: filename, parent, relative_parent, suffix, stem
     """
+    context["filename"] = context["source"].name
     context["parent"] = context["source"].parent
     context["relative_parent"] = context["relative_path"].parent
     context["suffix"] = ''.join(context["source"].suffixes)
@@ -256,4 +257,15 @@ def lock_release(context: dict, arg: Optional[str]) -> Optional[dict]:
                 logging.error(f"named lock \"{arg}\" not found")
             except RuntimeError:
                 logging.error(f"named lock \"{arg}\" already unlocked")
+    return context
+
+@wrapper
+async def publish(context: dict, arg: dict[str, str]) -> dict:
+    import dove
+    server = arg["server"]
+    for key in arg.keys():
+        if isinstance(arg[key], str):
+            arg[key] = arg[key].format(**context)
+    logging.info(arg)
+    await dove.publish(server, arg, arg.get("names", None))
     return context

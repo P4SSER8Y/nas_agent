@@ -143,6 +143,7 @@ class SortingAgent(threading.Thread):
             success = False
             for pipeline in self._pipelines_:
                 t = deepcopy(context)
+                t["name"] = pipeline["name"]
                 t["_ok"] = True
                 if t["source"] == pipeline["input"]:
                     continue
@@ -165,7 +166,7 @@ class SortingAgent(threading.Thread):
                 t.update(pipeline["context"])
                 for h in pipeline["process"]:
                     f = ProcessMap[h["type"]]
-                    arg = h.get("arg", None)
+                    arg = deepcopy(h.get("arg", None))
                     logging.debug(f"[{cnt}] enter {f.__name__}({arg})")
                     try:
                         if asyncio.iscoroutinefunction(f):
@@ -187,7 +188,7 @@ class SortingAgent(threading.Thread):
                     logging.warning(f"[{cnt}] failed, start failure cleanup")
                     for h in pipeline["failure"]:
                         f = ProcessMap[h["type"]]
-                        arg = h.get("arg", None)
+                        arg = deepcopy(h.get("arg", None))
                         logging.debug(f"[{cnt}] enter {f.__name__}({arg})")
                         try:
                             if asyncio.iscoroutinefunction(f):
@@ -211,6 +212,7 @@ class SortingAgent(threading.Thread):
         else:
             logging.debug(f"push {context}")
             context["timestamp"] = int(datetime.now().timestamp() * 1e9)
+            context["original"] = context["source"]
             task = asyncio.run_coroutine_threadsafe(self._async_handle(context), self._loop_)
             self._current_tasks_[context["source"]] = task
             task.add_done_callback(lambda task: self._current_tasks_.pop(context["source"]))
