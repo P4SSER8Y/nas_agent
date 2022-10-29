@@ -61,7 +61,7 @@ class SortingAgent(threading.Thread):
 
     def load_config(self, path):
         raw = None
-        logging.info("loading {}".format(path))
+        logging.info("loading {}".format(pathlib.Path(path).absolute().resolve()))
         with open(path, "r") as f:
             raw = yaml.load(f, Loader=yaml.SafeLoader)
         try:
@@ -78,11 +78,14 @@ class SortingAgent(threading.Thread):
                 temp["input"] = pathlib.Path(item["input"]).absolute().resolve()
                 temp["context"] = item.get("context", {})
                 temp["blacklist"] = item.get("blacklist", [])
-                for process in item["process"]:
-                    p = {}
-                    p["function"] = ProcessMap[process["type"]]
-                    p["arg"] = process.get("arg", "")
-                    temp["process"].append(p)
+                temp["process"] = item["process"]
+                for i in temp["process"]:
+                    if i["type"] not in ProcessMap.keys():
+                        raise KeyError(f"invalid process '{i['type']}'")
+                temp["failure"] = item.get("failure", [])
+                for i in temp["failure"]:
+                    if i["type"] not in ProcessMap.keys():
+                        raise KeyError(f"invalid process '{i['type']}'")
                 self._pipelines_.append(temp)
                 self._init_scan_.append(temp["input"])
                 logging.debug(temp)
@@ -140,6 +143,7 @@ class SortingAgent(threading.Thread):
             success = False
             for pipeline in self._pipelines_:
                 t = deepcopy(context)
+                t["_ok"] = True
                 if t["source"] == pipeline["input"]:
                     continue
                 if not t["source"].is_relative_to(pipeline["input"]):
@@ -160,8 +164,9 @@ class SortingAgent(threading.Thread):
                 logging.info(f"[{cnt}] matched {pipeline['name']} for {t['source']}")
                 t.update(pipeline["context"])
                 for h in pipeline["process"]:
-                    f, arg = h["function"], h["arg"]
-                    # logging.debug(f"[{cnt}] enter {f.__name__}")
+                    f = ProcessMap[h["type"]]
+                    arg = h.get("arg", None)
+                    logging.debug(f"[{cnt}] enter {f.__name__}({arg})")
                     try:
                         if asyncio.iscoroutinefunction(f):
                             t = await f(t, arg)
@@ -170,13 +175,28 @@ class SortingAgent(threading.Thread):
                     except Exception as e:
                         logging.critical(f"[{cnt}] handle {f.__name__} error")
                         logging.critical(traceback.format_exc())
-                        t = None
-                    if not t:
+                        t["_ok"] = False
+                    if not t["_ok"]:
                         break
-                    # logging.debug(f'[{cnt}] {t}')
-                if t:
+                    logging.debug(f'[{cnt}] {t}')
+
+                if t["_ok"]:
                     success = True
                     break
+                else:
+                    logging.warning(f"[{cnt}] failed, start failure cleanup")
+                    for h in pipeline["failure"]:
+                        f = ProcessMap[h["type"]]
+                        arg = h.get("arg", None)
+                        logging.debug(f"[{cnt}] enter {f.__name__}({arg})")
+                        try:
+                            if asyncio.iscoroutinefunction(f):
+                                t = await f(t, arg)
+                            else:
+                                t = f(t, arg)
+                        except Exception as e:
+                            logging.critical(f"[{cnt}] handle {f.__name__} error, skipped")
+
             if success:
                 logging.info(f"[{cnt}] success to process {context['source']}")
             else:

@@ -8,7 +8,7 @@ import pathlib
 from textwrap import wrap
 import aiofiles
 import shortuuid
-from typing import Optional
+from typing import Optional, Set
 from typing import Any
 __all__ = ["ProcessMap"]
 
@@ -77,11 +77,10 @@ def mkpath(context: dict, arg: str) -> Optional[dict]:
         os.chown(path, path.parent.stat().st_uid, path.parent.stat().st_gid)
         return True
 
-    if iter(context["destination"].parent):
-        return context
-    else:
+    if not iter(context["destination"].parent):
         logging.error(f"cannot make path for {context['destination']}")
-        return None
+        context["_ok"] = False
+    return context
 
 
 @wrapper
@@ -122,7 +121,19 @@ def failure(context: Any, arg: None):
     arg: None
     output: None
     """
-    return None
+    context["_ok"] = False
+    return context
+
+
+@wrapper
+def error(context: Any, arg: Any):
+    """trigger error
+    
+    input: Any
+    arg: Any
+    output: None
+    """
+    raise RuntimeError("error")
 
 
 @wrapper
@@ -133,10 +144,8 @@ def skip_directory(context: dict, arg: None) -> Optional[dict]:
     arg: None
     output: None
     """
-    if context["is_dir"]:
-        return None
-    else:
-        return context
+    context["_ok"] = not context["is_dir"]
+    return context
 
 
 @wrapper
@@ -198,30 +207,53 @@ def generate_uuid(context: dict, arg: int | str) -> Optional[dict]:
 
 @wrapper
 async def lock_acquire(context: dict, arg: str) -> Optional[dict]:
-    """acquire named lock
+    """acquire named lock, WARNING: may cause to deadlock if acquire multiple locks
 
     input: None
-    arg: name of lock
+    arg: name of lock, case insensitive
     output: None
     """
+    arg = arg.lower()
     if arg not in _locks_.keys():
         logging.info(f"create new named lock: {arg}")
         _locks_[arg] = asyncio.Lock()
     await _locks_[arg].acquire()
+    logging.info(f"acquired lock '{arg}'")
+    if "locks" not in context.keys():
+        context["locks"] = set()
+    context["locks"].add(arg.lower())
     return context
 
 
 @wrapper
-def lock_release(context: dict, arg: str) -> Optional[dict]:
-    """release named lock
+def lock_release(context: dict, arg: Optional[str]) -> Optional[dict]:
+    """release named lock, WARNING: may cause to deadlock if acquire multiple locks
 
-    input: None
-    arg: name of lock
+    input: None or lock
+    arg: str --- name of lock, case insensitive
+         None --- release all locked
     output: None
     """
-    try:
-        _locks_[arg].release()
-    except KeyError as e:
-        logging.error(f"named lock \"{arg}\" not found")
-        raise e
+    logging.debug(context)
+    if arg:
+        try:
+            logging.debug(f"unlock {arg.lower()}")
+            _locks_[arg.lower()].release()
+            _locks_["locks"]: Set.remove(arg.lower())
+        except KeyError as e:
+            logging.error(f"named lock \"{arg}\" not found")
+            raise e
+        except RuntimeError:
+            logging.error(f"named lock \"{arg}\" already unlocked")
+            raise e
+    else:
+        arg: list[str] = context.get("locks", [])
+        for item in arg:
+            try:
+                logging.debug(f"unlock {item}")
+                _locks_[item].release()
+            except KeyError:
+                logging.error(f"named lock \"{arg}\" not found")
+            except RuntimeError:
+                logging.error(f"named lock \"{arg}\" already unlocked")
     return context

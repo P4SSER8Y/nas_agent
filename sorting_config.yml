@@ -6,27 +6,26 @@ shared:
     - "*.crdownload"
 
 pipelines:
-  - name: wtf
-    re: "wtf(?!\\d).*.txt"
-    blacklist: *blacklist
-    input: ./test/ooxx
-    context:
-      output: ./test/output/ooxx
-    process:
-      - type: debug_info
   - name: ooxx
     glob: "*"
-    input: ./test/ooxx
+    input: ./local/test/ooxx
     blacklist: *blacklist
     context:
-      output: ./test/output/ooxx
+      output: ./local/test/output/ooxx
     process:
       - type: skip_directory
       - type: generate_uuid
         arg: 6
-      - type: digest
-        arg: sha1
       - type: parse_filename
+      - type: lock_acquire
+        arg: global
+      - type: delay
+        arg: 5
+      - type: failure
       - type: move
-        arg: "{output}/{relative_parent}/{timestamp:0.0f}-{digest}{suffix}"
+        arg: "{output}/{relative_parent}/{uuid}{suffix}"
       - type: debug_info
+      - type: lock_release
+        arg: global
+    failure:
+      - type: lock_release
