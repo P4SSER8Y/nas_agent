@@ -98,6 +98,7 @@ def move(context: dict, arg: str) -> Optional[dict]:
     if context:
         context["source"] = context["destination"]
     context = chown_to_parent(context, arg)
+    context = parse_filename(context, None)
     return context
 
 
