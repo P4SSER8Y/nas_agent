@@ -5,11 +5,17 @@ import hashlib
 import shutil
 import os
 import pathlib
+from textwrap import wrap
 import aiofiles
 import shortuuid
+from typing import Optional
+from typing import Any
 __all__ = ["ProcessMap"]
 
 ProcessMap = {}
+
+
+_locks_: list[asyncio.Lock] = {}
 
 
 def wrapper(func):
@@ -23,7 +29,7 @@ def wrapper(func):
 
 
 @wrapper
-async def delay(context, arg):
+async def delay(context: dict, arg: float | str) -> Optional[dict]:
     """delay some time
 
     input: None
@@ -37,7 +43,7 @@ async def delay(context, arg):
 
 
 @wrapper
-def chown_to_parent(context, arg):
+def chown_to_parent(context: dict, arg: None) -> Optional[dict]:
     """chown to the uid/pid of parent
 
     input: source
@@ -50,7 +56,7 @@ def chown_to_parent(context, arg):
 
 
 @wrapper
-def mkpath(context, arg: str):
+def mkpath(context: dict, arg: str) -> Optional[dict]:
     """make path
 
     the owners of all directories are set to the uid/pid of parent
@@ -79,7 +85,7 @@ def mkpath(context, arg: str):
 
 
 @wrapper
-def move(context, arg: str):
+def move(context: dict, arg: str) -> Optional[dict]:
     """move file to destination
 
     input: source, and fields in format argument
@@ -97,7 +103,7 @@ def move(context, arg: str):
 
 
 @wrapper
-def debug_info(context, arg):
+def debug_info(context: dict, arg: None) -> dict:
     """print debug infomation
 
     input: None
@@ -109,7 +115,7 @@ def debug_info(context, arg):
 
 
 @wrapper
-def failure(context, arg):
+def failure(context: Any, arg: None):
     """trigger failure and drop everything
 
     input: None
@@ -120,7 +126,7 @@ def failure(context, arg):
 
 
 @wrapper
-def skip_directory(context, arg):
+def skip_directory(context: dict, arg: None) -> Optional[dict]:
     """trigger failure if is directory
 
     input: is_dir
@@ -134,7 +140,7 @@ def skip_directory(context, arg):
 
 
 @wrapper
-def parse_filename(context, arg):
+def parse_filename(context: dict, arg: None) -> Optional[dict]:
     """parse file name and get relative information
 
     input: source
@@ -149,7 +155,7 @@ def parse_filename(context, arg):
 
 
 @wrapper
-async def digest(context, arg):
+async def digest(context: dict, arg: str) -> Optional[dict]:
     """calculate digest with file's content
 
     input: source
@@ -179,7 +185,7 @@ async def digest(context, arg):
 
 
 @wrapper
-def generate_uuid(context, arg):
+def generate_uuid(context: dict, arg: int | str) -> Optional[dict]:
     """generate short uuid
 
     input: None
@@ -187,4 +193,35 @@ def generate_uuid(context, arg):
     output: uuid
     """
     context["uuid"] = shortuuid.ShortUUID().random(int(arg))
+    return context
+
+
+@wrapper
+async def lock_acquire(context: dict, arg: str) -> Optional[dict]:
+    """acquire named lock
+
+    input: None
+    arg: name of lock
+    output: None
+    """
+    if arg not in _locks_.keys():
+        logging.info(f"create new named lock: {arg}")
+        _locks_[arg] = asyncio.Lock()
+    await _locks_[arg].acquire()
+    return context
+
+
+@wrapper
+def lock_release(context: dict, arg: str) -> Optional[dict]:
+    """release named lock
+
+    input: None
+    arg: name of lock
+    output: None
+    """
+    try:
+        _locks_[arg].release()
+    except KeyError as e:
+        logging.error(f"named lock \"{arg}\" not found")
+        raise e
     return context
