@@ -1,0 +1,11 @@
+doves:
+  - name: bark
+    type: bark
+    arg:
+      key: <key>
+      group: dove
+  - name: serverchan
+    type: serverchan
+    arg:
+      key: <key>
+

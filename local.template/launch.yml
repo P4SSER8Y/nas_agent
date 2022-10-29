@@ -1,7 +1,7 @@
 agents:
   - name: sorting-agent
     type: sorting_agent
-    config: ./sorting_config.yml
+    config: ./local.template/sorting_config.yml
   - name: dove
     type: dove
-    config: ./dove.yml
+    config: ./local.template/dove.yml

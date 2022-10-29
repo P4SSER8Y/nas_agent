@@ -1,0 +1,43 @@
+shared:
+  blacklist: &blacklist
+    - "nosync"
+    - "*.nosync"
+    - "Thumbs.db"
+    - ".DS_Store"
+  publish: &publish_arg
+    server: dove
+    title: "{name}"
+    names:
+      - serverchan
+
+pipelines:
+  - name: ooxx
+    glob: "*"
+    input: ./local/test/input
+    blacklist: *blacklist
+    context:
+      output: ./local/test/output
+    process:
+      - type: skip_directory
+      - type: publish
+        arg:
+          <<: *publish_arg
+          msg: "to publish {name}"
+      - type: delay
+        arg: 5.0
+      - type: digest
+        arg: md5
+      - type: parse_filename
+      - type: move
+        arg: "{output}/{uuid}.{suffix}"
+      - type: debug_info
+      - type: publish
+        arg:
+          <<: *publish_arg
+          msg: "succeed to handle {filename}"
+    failure:
+      - type: publish
+        arg:
+          <<: *publish_arg
+          msg: "failed to handle {original}"
+
