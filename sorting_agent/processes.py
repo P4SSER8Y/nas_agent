@@ -15,7 +15,8 @@ __all__ = ["ProcessMap"]
 ProcessMap = {}
 
 
-_locks_: list[asyncio.Lock] = {}
+_mutex_locks_ = asyncio.Lock()
+_locks_: dict[str, asyncio.Lock] = {}
 
 
 def wrapper(func):
@@ -29,7 +30,7 @@ def wrapper(func):
 
 
 @wrapper
-async def delay(context: dict, arg: float | str) -> Optional[dict]:
+async def delay(context: dict, arg: float | str) -> dict:
     """delay some time
 
     input: None
@@ -43,7 +44,7 @@ async def delay(context: dict, arg: float | str) -> Optional[dict]:
 
 
 @wrapper
-def chown_to_parent(context: dict, arg: None) -> Optional[dict]:
+def chown_to_parent(context: dict, arg: None) -> dict:
     """chown to the uid/pid of parent
 
     input: source
@@ -56,7 +57,7 @@ def chown_to_parent(context: dict, arg: None) -> Optional[dict]:
 
 
 @wrapper
-def mkpath(context: dict, arg: str) -> Optional[dict]:
+def mkpath(context: dict, arg: str) -> dict:
     """make path
 
     the owners of all directories are set to the uid/pid of parent
@@ -84,7 +85,7 @@ def mkpath(context: dict, arg: str) -> Optional[dict]:
 
 
 @wrapper
-def move(context: dict, arg: str) -> Optional[dict]:
+def move(context: dict, arg: str) -> dict:
     """move file to destination
 
     input: source, and fields in format argument
@@ -138,7 +139,7 @@ def error(context: Any, arg: Any):
 
 
 @wrapper
-def skip_directory(context: dict, arg: None) -> Optional[dict]:
+def skip_directory(context: dict, arg: None) -> dict:
     """trigger failure if is directory
 
     input: is_dir
@@ -150,7 +151,7 @@ def skip_directory(context: dict, arg: None) -> Optional[dict]:
 
 
 @wrapper
-def parse_filename(context: dict, arg: None) -> Optional[dict]:
+def parse_filename(context: dict, arg: None) -> dict:
     """parse file name and get relative information
 
     input: source
@@ -166,7 +167,7 @@ def parse_filename(context: dict, arg: None) -> Optional[dict]:
 
 
 @wrapper
-async def digest(context: dict, arg: str) -> Optional[dict]:
+async def digest(context: dict, arg: str) -> dict:
     """calculate digest with file's content
 
     input: source
@@ -196,7 +197,7 @@ async def digest(context: dict, arg: str) -> Optional[dict]:
 
 
 @wrapper
-def generate_uuid(context: dict, arg: int | str) -> Optional[dict]:
+def generate_uuid(context: dict, arg: int | str) -> dict:
     """generate short uuid
 
     input: None
@@ -208,48 +209,63 @@ def generate_uuid(context: dict, arg: int | str) -> Optional[dict]:
 
 
 @wrapper
-async def lock_acquire(context: dict, arg: str) -> Optional[dict]:
-    """acquire named lock, WARNING: may cause to deadlock if acquire multiple locks
+async def lock_acquire(context: dict, arg: list[str] | str) -> dict:
+    """acquire named lock
 
     input: None
     arg: name of lock, case insensitive
     output: None
     """
-    arg = arg.lower()
-    if arg not in _locks_.keys():
-        logging.info(f"create new named lock: {arg}")
-        _locks_[arg] = asyncio.Lock()
-    await _locks_[arg].acquire()
-    logging.info(f"acquired lock '{arg}'")
+    if isinstance(arg, str):
+        arg = [arg]
+    arg = [x.lower() for x in arg]
+
+    async with _mutex_locks_:
+        for item in arg:
+            if item not in _locks_.keys():
+                logging.info(f"create new named lock: {item}")
+                _locks_[item] = asyncio.Lock()
+
+    while True:
+        await _mutex_locks_.acquire()
+        for item in arg:
+            if _locks_[item].locked():
+                break
+        else:
+            break
+        _mutex_locks_.release()
+        logging.debug(f"cannot acquire locks")
+        await asyncio.sleep(0)
+
     if "locks" not in context.keys():
         context["locks"] = set()
-    context["locks"].add(arg.lower())
+    for item in arg:
+        await _locks_[item].acquire()
+        logging.info(f"acquired lock '{item}'")
+        context["locks"].add(item.lower())
+    _mutex_locks_.release()
     return context
 
 
 @wrapper
-def lock_release(context: dict, arg: Optional[str]) -> Optional[dict]:
-    """release named lock, WARNING: may cause to deadlock if acquire multiple locks
+async def lock_release(context: dict, arg: str | list[str] | None) -> dict:
+    """release named lock
 
     input: None or lock
     arg: str --- name of lock, case insensitive
          None --- release all locked
     output: None
     """
-    logging.debug(context)
-    if arg:
-        try:
-            logging.debug(f"unlock {arg.lower()}")
-            _locks_[arg.lower()].release()
-            _locks_["locks"]: Set.remove(arg.lower())
-        except KeyError as e:
-            logging.error(f"named lock \"{arg}\" not found")
-            raise e
-        except RuntimeError:
-            logging.error(f"named lock \"{arg}\" already unlocked")
-            raise e
-    else:
-        arg: list[str] = context.get("locks", [])
+    async with _mutex_locks_:
+        if isinstance(arg, str):
+            arg = [arg]
+        elif isinstance(arg, list) and len(arg) > 0:
+            pass
+        else:
+            arg: list[str] = context.get("locks", [])
+        arg = [x.lower() for x in arg]
+        logging.debug(f"try to release {arg}")
+
         for item in arg:
             try:
                 logging.debug(f"unlock {item}")
