@@ -68,6 +68,9 @@ class SortingAgent(threading.Thread):
             for item in raw["pipelines"]:
                 temp = {}
                 temp["name"] = item["name"]
+                if not item.get("enabled", True):
+                    logging.warning(f"pipeline[{temp['name']}] disabled")
+                    continue
                 if ("glob" in item.keys()) and ("re" in item.keys()):
                     raise Exception(f"use either glob or re in {item['name']}")
                 if "glob" in item.keys():

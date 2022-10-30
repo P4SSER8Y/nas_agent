@@ -12,6 +12,7 @@ shared:
 
 pipelines:
   - name: ooxx
+    enabled: false
     glob: "*"
     input: ./local/test/input
     blacklist: *blacklist
