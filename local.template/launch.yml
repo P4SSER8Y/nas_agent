@@ -5,3 +5,6 @@ agents:
   - name: dove
     type: dove
     config: ./local.template/dove.yml
+  - name: jarvis
+    type: jarvis
+    config: ./local.template/jarvis.yml

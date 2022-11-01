@@ -11,6 +11,30 @@ shared:
       - serverchan
 
 pipelines:
+  - name: a
+    glob: "a"
+    input: ./local/test/input
+    process:
+      - type: lock_acquire
+        arg:
+          - global
+          - a
+      - type: debug_info
+      - type: delay
+        arg: 5.0
+      - type: lock_release
+  - name: b
+    glob: "b"
+    input: ./local/test/input
+    process:
+      - type: lock_acquire
+        arg:
+          - global
+          - b
+      - type: debug_info
+      - type: delay
+        arg: 5.0
+      - type: lock_release
   - name: ooxx
     enabled: false
     glob: "*"

@@ -1,18 +1,13 @@
 import logging
 from rich.logging import RichHandler
 import click
+import sys
 
 
 @click.group()
-def main():
-    pass
-
-
-@main.command(help="takeoff and start")
-@click.argument("config", default="./launch.yml", type=click.Path(exists=True))
 @click.option("-l", "--log-level", default="info",
               type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"], case_sensitive=False))
-def takeoff(config, log_level):
+def main(log_level):
     MAP_LOG_LEVEL = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -24,7 +19,12 @@ def takeoff(config, log_level):
                         datefmt="[%m-%d %H:%M:%S]",
                         handlers=[RichHandler(rich_tracebacks=True)])
     logging.log(MAP_LOG_LEVEL[log_level], f"set log level to {log_level}")
+    logging.log(MAP_LOG_LEVEL[log_level], f"{sys.argv}")
 
+
+@main.command(help="takeoff and start")
+@click.argument("config", default="./launch.yml", type=click.Path(exists=True))
+def takeoff(config):
     from headquarter import entry
     entry(config)
 

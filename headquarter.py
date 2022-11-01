@@ -2,6 +2,7 @@ import yaml
 import signal
 from sorting_agent import SortingAgent
 from dove import Dove
+from jarvis import Jarvis
 import logging
 
 
@@ -19,6 +20,7 @@ def factory(object: dict):
     _MAP_ = {
         "sorting_agent": SortingAgent,
         "dove": Dove,
+        "jarvis": Jarvis,
     }
     logging.debug(object)
 
