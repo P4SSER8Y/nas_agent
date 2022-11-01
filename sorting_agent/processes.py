@@ -312,3 +312,15 @@ async def execute(context: dict, arg: list[str]) -> dict:
         logging.error(f"running {arg[0]} failed with return code={p.returncode}, args={' '.join(arg)}")
     logging.debug(f"stdout:\n{stdout}")
     return context
+
+@wrapper
+def get_datetime(context: None, arg: str) -> dict:
+    """get date time and format it
+
+    input: None
+    arg: datetime format, cf. https://docs.python.org/3/library/datetime.html#strftime-strptime-behavior
+    output: datetime
+    """
+    t = datetime.fromtimestamp(context["timestamp"] / 1e9)
+    context["datetime"] = t.strftime(arg)
+    return context
