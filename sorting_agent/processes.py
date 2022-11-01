@@ -1,3 +1,4 @@
+from datetime import datetime
 import functools
 import logging
 import asyncio
@@ -285,4 +286,29 @@ async def publish(context: dict, arg: dict[str, str]) -> dict:
             arg[key] = arg[key].format(**context)
     logging.info(arg)
     await dove.publish(server, arg, arg.get("names", None))
+    return context
+
+@wrapper
+async def execute(context: dict, arg: list[str]) -> dict:
+    """exec extern commands
+
+    input: dict
+    arg: arugments, first of which is the command
+    output: None
+    """
+    if (arg is None) or (len(arg) == 0):
+        logging.error(f"subprocess_exec's argument is empty")
+        context["_ok"] = False
+        return context
+
+    arg = [x.format(**context) for x in arg]
+    ts = datetime.now()
+    p = await asyncio.subprocess.create_subprocess_exec(*arg, stdout=asyncio.subprocess.PIPE)
+    stdout = await p.wait()
+    ts = datetime.now() - ts
+    context["_ok"] = (p.returncode == 0)
+    logging.info(f"running {arg[0]} consumed {ts.total_seconds():0.6} second(s)")
+    if not context["_ok"]:
+        logging.error(f"running {arg[0]} failed with return code={p.returncode}, args={' '.join(arg)}")
+    logging.debug(f"stdout:\n{stdout}")
     return context
