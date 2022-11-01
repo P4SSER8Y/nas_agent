@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime
 import functools
 import logging
@@ -131,7 +132,7 @@ def failure(context: Any, arg: None):
 @wrapper
 def error(context: Any, arg: Any):
     """trigger error
-    
+
     input: Any
     arg: Any
     output: None
@@ -277,6 +278,7 @@ async def lock_release(context: dict, arg: str | list[str] | None) -> dict:
                 logging.error(f"named lock \"{arg}\" already unlocked")
     return context
 
+
 @wrapper
 async def publish(context: dict, arg: dict[str, str]) -> dict:
     import dove
@@ -287,6 +289,7 @@ async def publish(context: dict, arg: dict[str, str]) -> dict:
     logging.info(arg)
     await dove.publish(server, arg, arg.get("names", None))
     return context
+
 
 @wrapper
 async def execute(context: dict, arg: list[str]) -> dict:
@@ -313,6 +316,7 @@ async def execute(context: dict, arg: list[str]) -> dict:
     logging.debug(f"stdout:\n{stdout}")
     return context
 
+
 @wrapper
 def get_datetime(context: None, arg: str) -> dict:
     """get date time and format it
@@ -323,4 +327,19 @@ def get_datetime(context: None, arg: str) -> dict:
     """
     t = datetime.fromtimestamp(context["timestamp"] / 1e9)
     context["datetime"] = t.strftime(arg)
+    return context
+
+
+@wrapper
+def copy_item(context: None, arg: list[str]) -> dict:
+    """rename item of context
+
+    input: arg[0]
+    arg: [source, destination]
+    output: arg[1]
+    """
+    if (not isinstance(arg, list)) or (len(arg) != 2):
+        context["_ok"] = False
+        return context
+    context[arg[1]] = deepcopy(context[arg[0]])
     return context
