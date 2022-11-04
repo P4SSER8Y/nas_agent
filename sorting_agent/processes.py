@@ -10,6 +10,7 @@ import pathlib
 from textwrap import wrap
 import aiofiles
 import shortuuid
+import stat
 from typing import Optional, Set
 from typing import Any
 __all__ = ["ProcessMap"]
@@ -76,8 +77,9 @@ def mkpath(context: dict, arg: str | pathlib.Path) -> dict:
         if not path.parent.exists():
             if not iter(path.parent):
                 return False
-        os.mkdir(path, 0o774)
+        os.mkdir(path)
         os.chown(path, path.parent.stat().st_uid, path.parent.stat().st_gid)
+        os.chmod(path, 0o777)
         return True
 
     if isinstance(arg, str):
