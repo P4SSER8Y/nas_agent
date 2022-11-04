@@ -59,7 +59,7 @@ def chown_to_parent(context: dict, arg: None) -> dict:
 
 
 @wrapper
-def mkpath(context: dict, arg: str) -> dict:
+def mkpath(context: dict, arg: str | pathlib.Path) -> dict:
     """make path
 
     the owners of all directories are set to the uid/pid of parent
@@ -80,8 +80,12 @@ def mkpath(context: dict, arg: str) -> dict:
         os.chown(path, path.parent.stat().st_uid, path.parent.stat().st_gid)
         return True
 
-    if not iter(context["destination"].parent):
-        logging.error(f"cannot make path for {context['destination']}")
+    if isinstance(arg, str):
+        path = pathlib.Path(arg.format(**context))
+    else:
+        path = arg
+    if not iter(path):
+        logging.error(f"cannot make path for {path}")
         context["_ok"] = False
     return context
 
@@ -95,7 +99,7 @@ def move(context: dict, arg: str) -> dict:
     output: source, destination
     """
     context["destination"] = pathlib.Path(arg.format(**context)).absolute().resolve()
-    context = mkpath(context, arg)
+    context = mkpath(context, context["destination"].parent)
     if context:
         shutil.move(context["source"], context["destination"])
     if context:
