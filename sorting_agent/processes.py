@@ -337,8 +337,8 @@ def get_datetime(context: None, arg: str) -> dict:
 
 
 @wrapper
-def copy_item(context: None, arg: list[str]) -> dict:
-    """rename item of context
+def copy_field(context: None, arg: list[str]) -> dict:
+    """copy field of context
 
     input: arg[0]
     arg: [source, destination]
