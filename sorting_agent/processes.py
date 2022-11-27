@@ -311,15 +311,16 @@ async def execute(context: dict, arg: list[str]) -> dict:
         return context
 
     arg = [x.format(**context) for x in arg]
+    logging.debug(f"args: {arg}")
     ts = datetime.now()
     p = await asyncio.subprocess.create_subprocess_exec(*arg, stdout=asyncio.subprocess.PIPE)
-    stdout = await p.wait()
     ts = datetime.now() - ts
-    context["_ok"] = (p.returncode == 0)
+    context["_ok"] = (await p.wait() == 0)
+    stdout = await p.stdout.readline()
     logging.info(f"running {arg[0]} consumed {ts.total_seconds():0.6} second(s)")
     if not context["_ok"]:
         logging.error(f"running {arg[0]} failed with return code={p.returncode}, args={' '.join(arg)}")
-    logging.debug(f"stdout:\n{stdout}")
+    logging.debug(f"stdout:\n{stdout.decode()}")
     return context
 
 
